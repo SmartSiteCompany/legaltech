@@ -23,7 +23,7 @@ Desarrollar un prototipo funcional que permita consultar, interpretar y generar 
 ## 🧠 Tecnologías utilizadas
 
 - ⚙️ **DeepSeek API / Local Model**
-- 🌐 **Node.js / Express.js** (Backend)
-- 🎨 **React.js** (Frontend)
+- 🌐 **Python 3.12 / Flask** (Backend)
+- 🎨 **HTML/CSS** (Frontend)
 - 🧹 **NLP Preprocessing** (tokenización, limpieza)
 - 🗂️ **Markdown / JSON** (estructura legal preprocesada)
