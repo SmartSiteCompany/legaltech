@@ -6,25 +6,94 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<!-- Barra lateral izquierda -->
-<div class="sidebar-left">
-  <div class="sidebar-header">
-    <h2>⚖️ Asistente</h2>
-    <button class="new-chat-btn">+ Nuevo chat</button>
-  </div>
 
-  <div class="chat-history-list">
-    <h3>Historial</h3>
-    <ul>
-      <li><a href="#">Chat 1</a></li>
-      <li><a href="#">Chat 2</a></li>
+  <!-- Barra lateral izquierda -->
+  <div class="sidebar-left">
+    <div class="sidebar-header">
+      <h2>⚖️ Asistente</h2>
+      <!-- Reemplazamos botón por enlace -->
+      <a href="{{ url_for('nuevo_chat') }}" class="new-chat-btn">+ Nuevo chat</a>
+    </div>
+
+    <div class="chat-history-list">
+      <h3>Historial</h3>
+    <ul class="lista-chats">
+      {% for chat_id, chat_data in historial_chats.items() %}
+      <li>
+        <a href="{{ url_for('ver_chat', chat_id=chat_id) }}" id="titulo-{{ chat_id }}">
+          {{ chat_data.titulo if chat_data.titulo else 'Sin título' }}
+        </a>
+        <button onclick="mostrarInputRenombrar('{{ chat_id }}')">✏️</button>
+        <button onclick="eliminarChat('{{ chat_id }}')">🗑️</button>
+        <input type="text" id="input-{{ chat_id }}" style="display:none;" placeholder="Nuevo título"
+              onkeydown="if(event.key === 'Enter') renombrarChat('{{ chat_id }}')" />
+      </li>
+      {% endfor %}
     </ul>
-  </div>
-</div>
-     
-  </div>  <div class="chat-container">
-    <h1> ¡Hola! Soy tu asistente Jurídico. ¿Con qué puedo ayudarte?</h1>
 
+<script>
+function eliminarChat(chatId) {
+  if (!confirm("¿Seguro que quieres eliminar este chat?")) return;
+
+  fetch(`/eliminar/${chatId}`, {
+    method: "POST"
+  })
+  .then(res => {
+    if (res.ok) {
+      location.reload();
+    } else {
+      alert("No se pudo eliminar el chat");
+    }
+  });
+}
+
+function mostrarInputRenombrar(chatId) {
+  const input = document.getElementById("input-" + chatId);
+  input.style.display = "inline";
+  input.focus();
+}
+
+function renombrarChat(chatId) {
+  const nuevoTitulo = document.getElementById("input-" + chatId).value.trim();
+  if (!nuevoTitulo) {
+    alert("El título no puede estar vacío.");
+    return;
+  }
+
+  fetch(`/renombrar/${chatId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nuevo_titulo: nuevoTitulo })
+  })
+  .then(res => {
+    if (res.ok) {
+      location.reload();  // Refresca para ver el nuevo título
+    } else {
+      alert("Error al renombrar el chat");
+    }
+  });}
+  </script>
+    </div>
+  </div>
+
+  <!-- Contenedor principal del chat -->
+   <div class="main-content">
+  <div class="chat-container">
+
+        <!-- Video de fondo dentro del contenedor de conversación -->
+    <div class="video-wrapper">
+      <video id="video-background" autoplay muted loop>
+        <source src="{{ url_for('static', filename='vid/matrix.mp4') }}" type="video/mp4">
+        <source src="{{ url_for('static', filename='vid/matrix.webm') }}" type="video/webm">
+        Tu navegador no soporta videos HTML5.
+      </video>
+    </div>
+
+    <div class="chat-header">
+      <h1>¡Hola! Soy tu asistente del Juicio Final</h1>
+    </div>
+
+    <!-- Historial de mensajes -->
     <div class="chat-history">
       {% for item in historial %}
         <div class="message user">
@@ -36,10 +105,13 @@
       {% endfor %}
     </div>
 
+    <!-- Formulario de preguntas -->
     <form method="POST" class="chat-form">
       <input type="text" name="pregunta" placeholder="Haz una pregunta..." required>
       <button type="submit">↑</button>
     </form>
   </div>
+
+   </div>
 </body>
 </html>

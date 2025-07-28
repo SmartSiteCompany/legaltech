@@ -1,65 +1,97 @@
-/* Estilos base */
+/* ======= ESTILOS GENERALES ======= */
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f7f9fb;
+  background-color: #010101;
   margin: 0;
   padding: 0;
-}
-
-.chat-container {
-  max-width: 800px;
-  margin: 40px auto;
-  background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  display: flex; /* Organiza sidebar y contenido en fila */
+  height: 100vh;
   overflow: hidden;
 }
 
-h1 {
-  background-color: #0059b3;
-  color: #ffffff;
+/* ======= CONTENEDOR PRINCIPAL (DERECHA DEL CHAT) ======= */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ======= CABECERA DEL CHAT ======= */
+.chat-header {
+  color: white;
   text-align: center;
+  font-size: 8px;
+  padding-left: 220px;
+  margin-bottom: 15px;
+}
+
+.chat-header h1 {
+  background-color: #1a2541;
+  color: #ffffff;
   font-weight: normal;
   padding: 20px;
   margin: 0;
+  font-size: 18px;
 }
 
-/* Historial de chat */
+/* ======= CONTENEDOR DE MENSAJES ======= */
 .chat-history {
-  max-height: 600px;
+  flex: 1;
+  padding-left: 250px;
+  max-height: calc(100vh - 140px); /* cabecera + margen inferior */
   overflow-y: auto;
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
 }
 
+/* Estilo común para mensajes */
 .message {
   margin-bottom: 15px;
   padding: 15px;
   border-radius: 8px;
   width: fit-content;
-  max-width: 70%;
+  max-width: 40%;
 }
 
+/* Mensaje del usuario */
 .user {
-  background-color: #e1ecfd;
-  margin-left: auto;
+  background-color: #4bbcc2;
+  margin-left: 880px;
+  color: #010101;
 }
 
+/* Mensaje del bot */
 .bot {
-  background-color: #eef7eb;
+  padding-left: 30px; /* También puedes probar con padding-left si usas otro estilo */
+  background-color: #44454a;
   margin-right: auto;
+  color: white;
 }
 
-/* Formulario tipo chat */
+/* ======= FORMULARIO DE ENTRADA DE MENSAJE ======= */
 .chat-form {
+  position: fixed;
+  bottom: 0;
+  left: 220px;
+  right: 0;
   display: flex;
-  border-top: 1px solid #ccc;
+  padding: 10px 20px;
+  background: #1a2541;
+  border-top: 1px solid #4bbcc2;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.3);
+  z-index: 10;
 }
 
 .chat-form input {
   flex: 1;
   padding: 14px;
   font-size: 16px;
-  border: none;
+  border: 1px solid #4bbcc2;
+  border-radius: 8px 0 0 8px;
+  background-color: #010101;
+  color: white;
 }
 
 .chat-form input:focus {
@@ -67,67 +99,64 @@ h1 {
 }
 
 .chat-form button {
-  background-color: #0059b3;
-  color: white;
+  background-color: #4bbcc2;
+  color: #010101;
   border: none;
   padding: 0 25px;
   font-size: 16px;
+  border-radius: 0 8px 8px 0;
   cursor: pointer;
-  transition: background-color 0.2s;
 }
 
 .chat-form button:hover {
-  background-color: #004a99;
+  background-color: #3aa5ab;
 }
 
-/* Contenedor global con barra lateral izquierda */
-body {
-  display: flex;
-}
-
-/* Barra blanca con borde 3D a la izquierda */
+/* ======= BARRA LATERAL IZQUIERDA ======= */
 .sidebar-left {
-  width: 200px;
-  background-color: #ffffff;
-  box-shadow: inset -4px 0 6px rgba(0, 0, 0, 0.1), 2px 0 5px rgba(0, 0, 0, 0.1); /* Efecto 3D */
-  border-right: 2px solid #ccc;
+  width: 220px;
+  background-color: #1a2541;
+  box-shadow: inset -4px 0 6px rgba(0, 0, 0, 0.2), 2px 0 5px rgba(0, 0, 0, 0.2);
+  border-right: 2px solid #4bbcc2;
   height: 100vh;
   position: fixed;
   left: 0;
   top: 0;
   z-index: 1;
+  color: white;
 }
 
-/* Ajustar el contenedor del chat para no quedar tapado */
-.chat-container {
-  margin-left: 220px; /* espacio para la barra izquierda */
-}
-
+/* ======= ENCABEZADO DE LA BARRA LATERAL ======= */
 .sidebar-header {
   padding: 20px;
-  border-bottom: 1px solid #ccc;
+  border-bottom: 1px solid #4bbcc2;
   text-align: center;
 }
 
 .sidebar-header h2 {
   font-size: 18px;
   margin: 0 0 10px;
+  color: white;
 }
 
+/* Botón "Nuevo Chat" */
 .new-chat-btn {
-  background-color: #0059b3;
-  color: white;
+  background-color: #4bbcc2;
+  color: #010101;
   border: none;
   padding: 10px 15px;
   cursor: pointer;
   font-size: 14px;
   border-radius: 6px;
+  display: inline-block;
+  text-decoration: none;
 }
 
 .new-chat-btn:hover {
-  background-color: #004a99;
+  background-color: #3aa5ab;
 }
 
+/* ======= HISTORIAL DE CHATS EN LA BARRA LATERAL ======= */
 .chat-history-list {
   padding: 20px;
 }
@@ -135,8 +164,9 @@ body {
 .chat-history-list h3 {
   font-size: 16px;
   margin-bottom: 10px;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #4bbcc2;
   padding-bottom: 5px;
+  color: white;
 }
 
 .chat-history-list ul {
@@ -147,14 +177,34 @@ body {
 
 .chat-history-list li {
   margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #4bbcc2;
 }
 
 .chat-history-list a {
   text-decoration: none;
-  color: #0059b3;
+  color: #4bbcc2;
   font-weight: bold;
 }
 
 .chat-history-list a:hover {
   text-decoration: underline;
+  color: #3aa5ab;
+}
+
+/* ======= VIDEO DE FONDO DETRÁS DEL CHAT ======= */
+.video-wrapper {
+  position: fixed;
+  top: 0;
+  left: 220px;
+  width: calc(100% - 220px);
+  height: 100%;
+  z-index: -1;
+  overflow: hidden;
+}
+
+#video-background {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }

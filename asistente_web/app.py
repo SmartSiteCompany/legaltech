@@ -1,6 +1,9 @@
-from flask import Flask, render_template, request, session
+from flask import Flask, render_template, request, session, redirect, url_for, jsonify
+import uuid
 import os
-import re
+import copy
+import mysql.connector
+
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -66,17 +69,112 @@ def index():
     if "historial" not in session:
         session["historial"] = []
 
+    if "historial_chats" not in session:
+        session["historial_chats"] = {}
+
     if request.method == "POST":
-        pregunta = request.form["pregunta"]
-        if pregunta.strip():
+        pregunta = request.form.get("pregunta", "").strip()
+
+        if pregunta:
             result = qa.invoke({"query": pregunta})
             respuesta = result["result"]
-            session["historial"].append({"pregunta": pregunta, "respuesta": respuesta})
-            session.modified = True  # importante para que guarde los cambios
-        else:
-            session["historial"].append({"pregunta": pregunta, "respuesta": "Pregunta no válida."})
 
-    return render_template("index.html", historial=session["historial"])
+            if not session["historial"]:
+                chat_id = str(uuid.uuid4())[:8]
+                session["current_chat_id"] = chat_id
+                session["historial"] = [{"pregunta": pregunta, "respuesta": respuesta}]
+                session["historial_chats"][chat_id] = {
+                    "titulo": pregunta[:30],  # título inicial (puedes personalizar esto)
+                    "mensajes": copy.deepcopy(session["historial"])
+                }
+            else:
+                session["historial"].append({"pregunta": pregunta, "respuesta": respuesta})
+                chat_id = session.get("current_chat_id")
+                if chat_id:
+                    session["historial_chats"][chat_id]["mensajes"] = copy.deepcopy(session["historial"])
+
+            session.modified = True
+        else:
+            session["historial"].append({"pregunta": "", "respuesta": "Pregunta no válida."})
+            session.modified = True
+
+    return render_template("index.html",
+                           historial=session["historial"],
+                           historial_chats=session["historial_chats"])
+
+
+# === RUTA PARA INICIAR UN NUEVO CHAT ===
+@app.route("/nuevo_chat")
+def nuevo_chat():
+    # Elimina el historial actual y el chat ID activo
+    session["historial"] = []
+    session.pop("current_chat_id", None)
+    session.modified = True
+    return redirect(url_for("index"))
+
+
+# === RUTA PARA VER UN CHAT GUARDADO ===
+@app.route("/chat/<chat_id>")
+def ver_chat(chat_id):
+    historial_chats = session.get("historial_chats", {})
+    chat = historial_chats.get(chat_id)
+    if chat:
+        session["historial"] = copy.deepcopy(chat["mensajes"])
+        session["current_chat_id"] = chat_id
+    else:
+        session["historial"] = []
+        session.pop("current_chat_id", None)
+
+    session.modified = True
+    return redirect(url_for("index"))
+
+# === RUTA PARA RENOMBRAR CHAT ===
+@app.route("/renombrar/<chat_id>", methods=["POST"])
+def renombrar_conversacion(chat_id):
+    historial_chats = session.get("historial_chats", {})
+    chat = historial_chats.get(chat_id)
+
+    if not chat:
+        return jsonify({"error": "Conversación no encontrada"}), 404
+
+    nuevo_titulo = request.json.get("nuevo_titulo", "").strip()
+    if not nuevo_titulo:
+        return jsonify({"error": "Título vacío"}), 400
+
+    chat["titulo"] = nuevo_titulo
+    historial_chats[chat_id] = chat
+    session["historial_chats"] = historial_chats
+    session.modified = True
+
+    return jsonify({"mensaje": "Título actualizado correctamente"}), 200
+
+# === RUTA PARA ELIMINAR ===
+# ✅ Ruta para eliminar una conversación
+@app.route("/eliminar/<chat_id>", methods=["POST"])
+def eliminar_conversacion(chat_id):
+    historial_chats = session.get("historial_chats", {})
+    if chat_id in historial_chats:
+        del historial_chats[chat_id]
+        session["historial_chats"] = historial_chats
+        # Si estabas viendo ese chat, limpiamos el current
+        if session.get("current_chat_id") == chat_id:
+            session["current_chat_id"] = None
+            session["historial"] = []
+        session.modified = True
+        return jsonify({"mensaje": "Conversación eliminada"}), 200
+    return jsonify({"error": "Chat no encontrado"}), 404
+
+# Conexión a la base de datos
+conexion = mysql.connector.connect(
+    host="localhost",
+    user="paduk_admin",
+    password="smartsite",
+    database="asistente_db"
+)
+
+@app.route("/home")
+def home():
+    return "Conexión a MySQL exitosa"
 
 if __name__ == "__main__":
     app.run(debug=True)
