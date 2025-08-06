@@ -1,10 +1,12 @@
-from flask import Flask, render_template, request, session, redirect, url_for, jsonify
+from flask import Flask, render_template, request, session, redirect, url_for, jsonify, flash
+from db import conexion, cursor
+from werkzeug.security import generate_password_hash, check_password_hash
+
 import uuid
 import os
 import copy
-import mysql.connector
 
-
+# === RAG y configuración del sistema ===
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_ollama import OllamaEmbeddings, OllamaLLM
@@ -12,16 +14,11 @@ from langchain_community.vectorstores import Chroma
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 
-# === Configuración ===
 PDF_PATH = "documentos/CONSTITUCION MEXICANA_.pdf"
 CHROMA_DB_PATH = "./chroma_db"
 EMBEDDING_MODEL = "nomic-embed-text"
 OLLAMA_MODEL = "deepseek-r1:1.5b"
 
-app = Flask(__name__)
-app.secret_key = "supersecreto"  # Requerido para session
-
-# === Cargar y preparar sistema RAG ===
 print("📄 Cargando y procesando el PDF...")
 loader = PyPDFLoader(PDF_PATH)
 documents = loader.load()
@@ -63,8 +60,77 @@ qa = RetrievalQA.from_chain_type(
 
 print("✅ Sistema cargado. Listo para recibir preguntas.")
 
-# === RUTA PRINCIPAL ===
+# === Inicialización Flask ===
+app = Flask(__name__)
+app.secret_key = "supersecreto"
+
+# Decorador para proteger rutas que requieren login
+def login_required(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Ruta login
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username'].strip()
+        password = request.form['password']
+
+        cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+        user = cursor.fetchone()
+
+        if user and check_password_hash(user['password'], password):
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            return redirect(url_for('index'))
+        else:
+            flash('Usuario o contraseña incorrectos')
+            return render_template('login.html')
+
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username'].strip()
+        password = request.form['password']
+        confirm_password = request.form['confirm_password']
+
+        # Validar que las contraseñas coincidan
+        if password != confirm_password:
+            flash('Las contraseñas no coinciden')
+            return render_template('register.html')
+
+        password_hash = generate_password_hash(password)
+
+        # Verificar si usuario existe
+        cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+        if cursor.fetchone():
+            flash('El usuario ya existe')
+            return render_template('register.html')
+
+        # Insertar usuario nuevo
+        cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, password_hash))
+        conexion.commit()
+        flash('Usuario creado exitosamente. Por favor inicia sesión.')
+        return redirect(url_for('login'))
+
+    return render_template('register.html')
+
+# Ruta logout
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+# Ruta principal con sistema RAG y protegida con login
 @app.route("/", methods=["GET", "POST"])
+@login_required
 def index():
     if "historial" not in session:
         session["historial"] = []
@@ -84,7 +150,7 @@ def index():
                 session["current_chat_id"] = chat_id
                 session["historial"] = [{"pregunta": pregunta, "respuesta": respuesta}]
                 session["historial_chats"][chat_id] = {
-                    "titulo": pregunta[:30],  # título inicial (puedes personalizar esto)
+                    "titulo": pregunta[:30],
                     "mensajes": copy.deepcopy(session["historial"])
                 }
             else:
@@ -98,23 +164,21 @@ def index():
             session["historial"].append({"pregunta": "", "respuesta": "Pregunta no válida."})
             session.modified = True
 
-    return render_template("index.html",
+    return render_template("ia.html",
                            historial=session["historial"],
                            historial_chats=session["historial_chats"])
 
-
-# === RUTA PARA INICIAR UN NUEVO CHAT ===
+# Rutas para manejo de chats (nuevo, ver, renombrar, eliminar)
 @app.route("/nuevo_chat")
+@login_required
 def nuevo_chat():
-    # Elimina el historial actual y el chat ID activo
     session["historial"] = []
     session.pop("current_chat_id", None)
     session.modified = True
     return redirect(url_for("index"))
 
-
-# === RUTA PARA VER UN CHAT GUARDADO ===
 @app.route("/chat/<chat_id>")
+@login_required
 def ver_chat(chat_id):
     historial_chats = session.get("historial_chats", {})
     chat = historial_chats.get(chat_id)
@@ -128,8 +192,8 @@ def ver_chat(chat_id):
     session.modified = True
     return redirect(url_for("index"))
 
-# === RUTA PARA RENOMBRAR CHAT ===
 @app.route("/renombrar/<chat_id>", methods=["POST"])
+@login_required
 def renombrar_conversacion(chat_id):
     historial_chats = session.get("historial_chats", {})
     chat = historial_chats.get(chat_id)
@@ -148,15 +212,13 @@ def renombrar_conversacion(chat_id):
 
     return jsonify({"mensaje": "Título actualizado correctamente"}), 200
 
-# === RUTA PARA ELIMINAR ===
-# ✅ Ruta para eliminar una conversación
 @app.route("/eliminar/<chat_id>", methods=["POST"])
+@login_required
 def eliminar_conversacion(chat_id):
     historial_chats = session.get("historial_chats", {})
     if chat_id in historial_chats:
         del historial_chats[chat_id]
         session["historial_chats"] = historial_chats
-        # Si estabas viendo ese chat, limpiamos el current
         if session.get("current_chat_id") == chat_id:
             session["current_chat_id"] = None
             session["historial"] = []
@@ -164,14 +226,7 @@ def eliminar_conversacion(chat_id):
         return jsonify({"mensaje": "Conversación eliminada"}), 200
     return jsonify({"error": "Chat no encontrado"}), 404
 
-# Conexión a la base de datos
-conexion = mysql.connector.connect(
-    host="localhost",
-    user="paduk_admin",
-    password="smartsite",
-    database="asistente_db"
-)
-
+# Ruta prueba conexión
 @app.route("/home")
 def home():
     return "Conexión a MySQL exitosa"
