@@ -1,10 +1,14 @@
 from flask import Flask, render_template, request, session, redirect, url_for, jsonify, flash
-from db import conexion, cursor
+from db import get_db_connection, get_dict_cursor
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+
 
 import uuid
 import os
 import copy
+import mysql.connector
+
 
 # === RAG y configuración del sistema ===
 from langchain_community.document_loaders import PyPDFLoader
@@ -81,8 +85,15 @@ def login():
         username = request.form['username'].strip()
         password = request.form['password']
 
+        conexion = get_db_connection()
+        cursor = conexion.cursor(dictionary=True)
+
         cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
         user = cursor.fetchone()
+
+        cursor.close()
+        conexion.close()
+
 
         if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
@@ -108,6 +119,9 @@ def register():
 
         password_hash = generate_password_hash(password)
 
+        conexion = get_db_connection()
+        cursor = conexion.cursor(dictionary=True)
+
         # Verificar si usuario existe
         cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
         if cursor.fetchone():
@@ -117,6 +131,10 @@ def register():
         # Insertar usuario nuevo
         cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, password_hash))
         conexion.commit()
+
+        cursor.close()
+        conexion.close()
+
         flash('Usuario creado exitosamente. Por favor inicia sesión.')
         return redirect(url_for('login'))
 
@@ -132,99 +150,150 @@ def logout():
 @app.route("/", methods=["GET", "POST"])
 @login_required
 def index():
-    if "historial" not in session:
-        session["historial"] = []
+    user_id = session.get("user_id")
 
-    if "historial_chats" not in session:
-        session["historial_chats"] = {}
+    conexion = get_db_connection()
+    cursor = conexion.cursor(dictionary=True)
+
+    # Cargar chats del usuario para mostrar en el historial lateral
+    cursor.execute("SELECT id, nombre_chat FROM chats WHERE user_id = %s ORDER BY fecha_creacion DESC", (user_id,))
+    chats = cursor.fetchall()
+
+    current_chat_id = session.get("current_chat_id")
+
+    mensajes = []
+    if current_chat_id:
+        # Cargar mensajes del chat seleccionado
+        cursor.execute("SELECT tipo, contenido FROM mensajes WHERE chat_id = %s ORDER BY fecha ASC", (current_chat_id,))
+        mensajes = cursor.fetchall()
 
     if request.method == "POST":
         pregunta = request.form.get("pregunta", "").strip()
 
         if pregunta:
-            result = qa.invoke({"query": pregunta})
-            respuesta = result["result"]
+            # Obtiene la respuesta del sistema RAG
+            respuesta = qa.invoke({"query": pregunta})["result"]
 
-            if not session["historial"]:
-                chat_id = str(uuid.uuid4())[:8]
-                session["current_chat_id"] = chat_id
-                session["historial"] = [{"pregunta": pregunta, "respuesta": respuesta}]
-                session["historial_chats"][chat_id] = {
-                    "titulo": pregunta[:30],
-                    "mensajes": copy.deepcopy(session["historial"])
-                }
-            else:
-                session["historial"].append({"pregunta": pregunta, "respuesta": respuesta})
-                chat_id = session.get("current_chat_id")
-                if chat_id:
-                    session["historial_chats"][chat_id]["mensajes"] = copy.deepcopy(session["historial"])
+            if not current_chat_id:
+                # Crear un nuevo chat
+                cursor.execute(
+                    "INSERT INTO chats (user_id, nombre_chat) VALUES (%s, %s)",
+                    (user_id, pregunta[:30])
+                )
+                conexion.commit()
+                current_chat_id = cursor.lastrowid
+                session["current_chat_id"] = current_chat_id
 
-            session.modified = True
+            # Guardar mensaje del usuario
+            cursor.execute(
+                "INSERT INTO mensajes (chat_id, tipo, contenido) VALUES (%s, %s, %s)",
+                (current_chat_id, 'usuario', pregunta)
+            )
+            # Guardar mensaje del asistente
+            cursor.execute(
+                "INSERT INTO mensajes (chat_id, tipo, contenido) VALUES (%s, %s, %s)",
+                (current_chat_id, 'asistente', respuesta)
+            )
+            conexion.commit()
+
+            # Recargar mensajes para mostrar la conversación actualizada
+            cursor.execute("SELECT tipo, contenido FROM mensajes WHERE chat_id = %s ORDER BY fecha ASC", (current_chat_id,))
+            mensajes = cursor.fetchall()
+
         else:
-            session["historial"].append({"pregunta": "", "respuesta": "Pregunta no válida."})
-            session.modified = True
+            flash("Pregunta no válida.")
 
-    return render_template("ia.html",
-                           historial=session["historial"],
-                           historial_chats=session["historial_chats"])
+    cursor.close()
+    conexion.close()
+
+    return render_template("ia.html", 
+                           historial_chats=chats,  # lista de chats del usuario
+                           historial=mensajes,     # mensajes del chat activo
+                           current_chat_id=current_chat_id)
 
 # Rutas para manejo de chats (nuevo, ver, renombrar, eliminar)
 @app.route("/nuevo_chat")
 @login_required
 def nuevo_chat():
-    session["historial"] = []
     session.pop("current_chat_id", None)
-    session.modified = True
     return redirect(url_for("index"))
 
-@app.route("/chat/<chat_id>")
+@app.route("/chat/<int:chat_id>")
 @login_required
 def ver_chat(chat_id):
-    historial_chats = session.get("historial_chats", {})
-    chat = historial_chats.get(chat_id)
+    user_id = session.get("user_id")
+    conexion = get_db_connection()
+    cursor = conexion.cursor(dictionary=True)
+
+    # Validar que el chat pertenece al usuario
+    cursor.execute("SELECT id FROM chats WHERE id = %s AND user_id = %s", (chat_id, user_id))
+    chat = cursor.fetchone()
+
+    cursor.close()
+    conexion.close()
+
     if chat:
-        session["historial"] = copy.deepcopy(chat["mensajes"])
         session["current_chat_id"] = chat_id
     else:
-        session["historial"] = []
+        flash("No tienes acceso a este chat.")
         session.pop("current_chat_id", None)
 
-    session.modified = True
     return redirect(url_for("index"))
 
-@app.route("/renombrar/<chat_id>", methods=["POST"])
+@app.route("/renombrar/<int:chat_id>", methods=["POST"])
 @login_required
 def renombrar_conversacion(chat_id):
-    historial_chats = session.get("historial_chats", {})
-    chat = historial_chats.get(chat_id)
-
-    if not chat:
-        return jsonify({"error": "Conversación no encontrada"}), 404
-
+    user_id = session.get("user_id")
     nuevo_titulo = request.json.get("nuevo_titulo", "").strip()
     if not nuevo_titulo:
         return jsonify({"error": "Título vacío"}), 400
 
-    chat["titulo"] = nuevo_titulo
-    historial_chats[chat_id] = chat
-    session["historial_chats"] = historial_chats
-    session.modified = True
+    conexion = get_db_connection()
+    cursor = conexion.cursor()
+
+    # Validar que el chat es del usuario
+    cursor.execute("SELECT id FROM chats WHERE id = %s AND user_id = %s", (chat_id, user_id))
+    if not cursor.fetchone():
+        cursor.close()
+        conexion.close()
+        return jsonify({"error": "Conversación no encontrada"}), 404
+
+    # Actualizar título
+    cursor.execute("UPDATE chats SET nombre_chat = %s WHERE id = %s", (nuevo_titulo, chat_id))
+    conexion.commit()
+    cursor.close()
+    conexion.close()
 
     return jsonify({"mensaje": "Título actualizado correctamente"}), 200
 
-@app.route("/eliminar/<chat_id>", methods=["POST"])
+@app.route("/eliminar/<int:chat_id>", methods=["POST"])
 @login_required
 def eliminar_conversacion(chat_id):
-    historial_chats = session.get("historial_chats", {})
-    if chat_id in historial_chats:
-        del historial_chats[chat_id]
-        session["historial_chats"] = historial_chats
-        if session.get("current_chat_id") == chat_id:
-            session["current_chat_id"] = None
-            session["historial"] = []
-        session.modified = True
-        return jsonify({"mensaje": "Conversación eliminada"}), 200
-    return jsonify({"error": "Chat no encontrado"}), 404
+    user_id = session.get("user_id")
+    conexion = get_db_connection()
+    cursor = conexion.cursor()
+
+    # Validar que el chat es del usuario
+    cursor.execute("SELECT id FROM chats WHERE id = %s AND user_id = %s", (chat_id, user_id))
+    if not cursor.fetchone():
+        cursor.close()
+        conexion.close()
+        return jsonify({"error": "Chat no encontrado"}), 404
+
+    # Borrar mensajes
+    cursor.execute("DELETE FROM mensajes WHERE chat_id = %s", (chat_id,))
+    # Borrar chat
+    cursor.execute("DELETE FROM chats WHERE id = %s", (chat_id,))
+    conexion.commit()
+
+    cursor.close()
+    conexion.close()
+
+    # Si borraste el chat activo, limpiar sesión
+    if session.get("current_chat_id") == chat_id:
+        session.pop("current_chat_id", None)
+
+    return jsonify({"mensaje": "Conversación eliminada"}), 200
 
 # Ruta prueba conexión
 @app.route("/home")

@@ -23,17 +23,17 @@
     <div class="chat-history-list">
       <h3>Historial</h3>
     <ul class="lista-chats">
-      {% for chat_id, chat_data in historial_chats.items() %}
+    {% for chat in historial_chats %}
       <li>
-        <a href="{{ url_for('ver_chat', chat_id=chat_id) }}" id="titulo-{{ chat_id }}">
-          {{ chat_data.titulo if chat_data.titulo else 'Sin título' }}
+        <a href="{{ url_for('ver_chat', chat_id=chat.id) }}" id="titulo-{{ chat.id }}">
+          {{ chat.nombre_chat if chat.nombre_chat else 'Sin título' }}
         </a>
-        <button onclick="mostrarInputRenombrar('{{ chat_id }}')">✏️</button>
-        <button onclick="eliminarChat('{{ chat_id }}')">🗑️</button>
-        <input type="text" id="input-{{ chat_id }}" style="display:none;" placeholder="Nuevo título"
-              onkeydown="if(event.key === 'Enter') renombrarChat('{{ chat_id }}')" />
+        <button onclick="mostrarInputRenombrar('{{ chat.id }}')">✏️</button>
+        <button onclick="eliminarChat('{{ chat.id }}')">🗑️</button>
+        <input type="text" id="input-{{ chat.id }}" style="display:none;" placeholder="Nuevo título"
+              onkeydown="if(event.key === 'Enter') renombrarChat('{{ chat.id }}')" />
       </li>
-      {% endfor %}
+    {% endfor %}
     </ul>
 
 <script>
@@ -99,19 +99,22 @@ function renombrarChat(chatId) {
     </div>
 
     <!-- Historial de mensajes -->
-    <div class="chat-history">
-      {% for item in historial %}
-        <div class="message user">
-          <strong>Tú:</strong> {{ item.pregunta }}
-        </div>
-        <div class="message bot">
-          <strong>IA:</strong> {{ item.respuesta }}
-        </div>
-      {% endfor %}
-    </div>
+<div class="chat-history">
+  {% for mensaje in historial %}
+    {% if mensaje.tipo == 'usuario' %}
+      <div class="message user">
+        <strong>Tú:</strong> {{ mensaje.contenido }}
+      </div>
+    {% elif mensaje.tipo == 'asistente' %}
+      <div class="message bot">
+        <strong>IA:</strong> {{ mensaje.contenido }}
+      </div>
+    {% endif %}
+  {% endfor %}
+</div>
 
     <!-- Formulario de preguntas -->
-    <form method="POST" class="chat-form">
+    <form method="POST" action="{{ url_for('index') }}" class="chat-form">
       <input type="text" name="pregunta" placeholder="Haz una pregunta..." required>
       <button type="submit">↑</button>
     </form>

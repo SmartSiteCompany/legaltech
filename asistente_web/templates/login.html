@@ -1,34 +1,46 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Iniciar Sesión</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta charset="UTF-8" />
+    <title>Iniciar Sesión</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
-<body>
-  <div class="form-container">
-    <h2>Iniciar Sesión</h2>
+<body class="login-body">
 
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <ul class="flashes">
-          {% for message in messages %}
-            <li class="error">{{ message }}</li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-    {% endwith %}
+    <!-- Video de fondo -->
+    <video autoplay muted loop playsinline class="bg-video">
+        <source src="{{ url_for('static', filename='vid/tierra-espacio.mp4') }}" type="video/mp4">
+        <source src="{{ url_for('static', filename='vid/tierra-espacio.webm') }}" type="video/webm">
+        Tu navegador no soporta videos HTML5.
+    </video>
 
-    <form method="POST">
-      <label for="username">Nombre de usuario:</label>
-      <input type="text" name="username" id="username" required>
+    <div class="login-container">
+        <h2>Iniciar Sesión</h2>
 
-      <label for="password">Contraseña:</label>
-      <input type="password" name="password" id="password" required>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="alert">
+                    {% for message in messages %}
+                        <p>{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
 
-      <button type="submit">Ingresar</button>
-    </form>
-    <p>¿No tienes cuenta? <a href="{{ url_for('register') }}">Regístrate aquí</a></p>
-  </div>
+        <form method="POST" class="login-form">
+            <label for="username">Usuario</label>
+            <input type="text" name="username" id="username" placeholder="Escribe tu usuario" required />
+
+            <label for="password">Contraseña</label>
+            <input type="password" name="password" id="password" placeholder="••••••••" required />
+
+            <button type="submit" class="btn-login">Ingresar</button>
+        </form>
+
+        <p class="register-link">
+            ¿No tienes cuenta?
+            <a href="{{ url_for('register') }}">Regístrate aquí</a>
+        </p>
+    </div>
 </body>
 </html>
