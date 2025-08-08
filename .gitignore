@@ -1,22 +1,19 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+# Entorno virtual
+rag_venv/
+venv/
 
-# SQLite database files
+# Archivos de base de datos
 *.sqlite3
 
-# Virtual environments
-venv/
-rag_venv/
+# Archivos grandes / multimedia
+*.mp4
+*.bin
 
-# Logs and databases
+# Caché y compilados
+__pycache__/
+*.py[cod]
+
+# Otros
 *.log
-
-# Editor folders
 .vscode/
 .idea/
-
-# System files
-.DS_Store
-Thumbs.db
