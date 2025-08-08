@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Iniciar Sesión</title>
+   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+  <body class="auth-page">
+
+  <div class="container mt-5">
+    <h2 class="text-center mb-4">Iniciar Sesión</h2>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="alert alert-danger">{{ messages[0] }}</div>
+      {% endif %}
+    {% endwith %}
+    <form method="POST" class="card p-4 shadow-sm">
+      
+        <label for="username">Usuario</label>
+        <input type="text" name="username" id="username" required>
+      
+        <label for="password">Contraseña</label>
+        <input type="password" name="password"  id="password" required>
+        
+        <button type="submit">Entrar</button>
+
+        <a href="{{ url_for('register') }}">Crear una cuenta nueva</a>
+      </div>
+    </form>
+  </div>
+</body>
+</html>
