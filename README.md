@@ -23,8 +23,8 @@ Desarrollar un prototipo funcional que permita consultar, interpretar y generar 
 ## 🧠 Tecnologías utilizadas
 
 - ⚙️ **DeepSeek API / Local Model**
-- 🌐 **Python 3.12 / Flask** (Backend)
-- 🎨 **HTML/CSS** (Frontend)
+- 🌐 **Python 3.12 / Flask / javascript** (Backend)
+- 🎨 **HTML / CSS / javascript** (Frontend)
 - 🧹 **NLP Preprocessing** (tokenización, limpieza)
 - 🗂️ **Markdown / JSON** (estructura legal preprocesada)
 
